@@ -54,3 +54,7 @@ To test WebSocket events, use a WebSocket client like wscat:
   wscat -c ws://localhost:5000/socket.io/?EIO=3&transport=websocket
 
 That's it!
+
+Here is the code flow:
+![image](https://github.com/user-attachments/assets/b90ec83b-22eb-494b-8548-bee48593b60e)
+
