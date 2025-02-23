@@ -80,9 +80,12 @@ def handle_join(data):
         username = decoded['sub']
         active_users[request.sid] = username
         user_sessions[request.sid] = username
-        
+
         # Emit update to all clients, including the sender
         emit("update-users", {"users": list(active_users.values())}, broadcast=True, include_self=True)
+        
+        # Send the current shared code to the newly connected client
+        emit("receive-code", shared_code, room=request.sid)
     except Exception as e:
         print(f"Invalid token: {e}")
 
