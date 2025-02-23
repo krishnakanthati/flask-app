@@ -1,25 +1,26 @@
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, emit
-from flask_jwt_extended import (
-    JWTManager, create_access_token, jwt_required, decode_token
-)
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, decode_token
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_cors import CORS
+from flask_pymongo import PyMongo
 
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend communication
 
-# Configure secret keys
+# Configure secret keys and MongoDB URI with a descriptive database name
 app.config['SECRET_KEY'] = 'your_secret_key'
 app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key'
+app.config["MONGO_URI"] = "mongodb://localhost:27017/collab_code_db"
 
 # Initialize Flask extensions
+mongo = PyMongo(app)
+users_collection = mongo.db.users
 socketio = SocketIO(app, cors_allowed_origins="*")
 jwt = JWTManager(app)
 
-# In-memory user database (for demonstration purposes)
-users = {}
+# In-memory structures for real-time collaboration (optional persistence via MongoDB)
 active_users = {}  # Stores {sid: username}
 user_sessions = {}  # Maps session ID to username
 cursor_positions = {}  # Stores {username: {x: 0, y: 0}}
@@ -35,10 +36,13 @@ def register():
     username = data['username']
     password = data['password']
 
-    if username in users:
+    # Check if user already exists in MongoDB
+    if users_collection.find_one({'username': username}):
         return jsonify({'message': 'User already exists'}), 400
 
-    users[username] = {'password': generate_password_hash(password)}
+    # Store hashed password in MongoDB
+    hashed_password = generate_password_hash(password)
+    users_collection.insert_one({'username': username, 'password': hashed_password})
     return jsonify({'message': 'User registered successfully'}), 201
 
 @app.route('/auth/login', methods=['POST'])
@@ -54,7 +58,9 @@ def login():
     if not username or not password:
         return jsonify({'message': 'Username and password are required'}), 400
 
-    if username not in users or not check_password_hash(users[username]['password'], password):
+    # Retrieve user from MongoDB
+    user = users_collection.find_one({'username': username})
+    if not user or not check_password_hash(user['password'], password):
         return jsonify({'message': 'Invalid credentials'}), 401
 
     access_token = create_access_token(identity=username)
@@ -66,10 +72,9 @@ def protected():
     """Protected route (requires authentication)."""
     return jsonify({'message': 'This is a protected route'}), 200
 
-# WebSocket event handlers
+# WebSocket event handlers for real-time collaboration
 @socketio.on('connect')
 def handle_connect():
-    """Handles new WebSocket connections."""
     print(f"New connection: {request.sid}")
 
 @socketio.on('join')
@@ -83,7 +88,6 @@ def handle_join(data):
 
         # Emit update to all clients, including the sender
         emit("update-users", {"users": list(active_users.values())}, broadcast=True, include_self=True)
-        
         # Send the current shared code to the newly connected client
         emit("receive-code", shared_code, room=request.sid)
     except Exception as e:
@@ -91,13 +95,11 @@ def handle_join(data):
 
 @socketio.on('send-code')
 def handle_code_change(data):
-    """Handles real-time code sharing."""
     shared_code['code'] = data.get('code', '')
     emit('receive-code', shared_code, broadcast=True)
 
 @socketio.on('cursor-move')
 def handle_cursor_move(data):
-    """Updates the cursor position of a user and notifies all clients."""
     username = user_sessions.get(request.sid)
     if username:
         cursor_positions[username] = data
@@ -105,7 +107,6 @@ def handle_cursor_move(data):
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    """Handles user disconnections."""
     sid = request.sid
     username = user_sessions.pop(sid, None)
     if username:

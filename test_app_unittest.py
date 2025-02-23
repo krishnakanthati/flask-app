@@ -1,14 +1,15 @@
 import unittest
 import json
-from app import app, socketio, users, active_users, user_sessions, shared_code
+from app import app, socketio, mongo, active_users, user_sessions, shared_code
 
 class SimpleTestCase(unittest.TestCase):
     def setUp(self):
         app.config['TESTING'] = True
         self.client = app.test_client()
         self.socket_client = socketio.test_client(app, flask_test_client=self.client)
-        # Reset global state before each test.
-        users.clear()
+        # Clear the MongoDB users collection
+        mongo.db.users.delete_many({})
+        # Reset in-memory state for real-time collaboration
         active_users.clear()
         user_sessions.clear()
         shared_code['code'] = ''
