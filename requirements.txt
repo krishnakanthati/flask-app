@@ -2,3 +2,6 @@ flask
 flask_socketio
 eventlet
 flask_pymongo
+flask_jwt_extended
+flask_cors
+werkzeug

@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, emit
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, decode_token
@@ -9,10 +10,10 @@ from flask_pymongo import PyMongo
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend communication
 
-# Configure secret keys and MongoDB URI with a descriptive database name
+# Configure secret keys and MongoDB URI (read from environment variable)
 app.config['SECRET_KEY'] = 'your_secret_key'
 app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key'
-app.config["MONGO_URI"] = "mongodb://localhost:27017/collab_code_db"
+app.config["MONGO_URI"] = os.environ.get("MONGO_URI", "mongodb://localhost:27017/collab_code_db")
 
 # Initialize Flask extensions
 mongo = PyMongo(app)
@@ -20,9 +21,9 @@ users_collection = mongo.db.users
 socketio = SocketIO(app, cors_allowed_origins="*")
 jwt = JWTManager(app)
 
-# In-memory structures for real-time collaboration (optional persistence via MongoDB)
-active_users = {}  # Stores {sid: username}
-user_sessions = {}  # Maps session ID to username
+# In-memory structures for real-time collaboration
+active_users = {}      # Stores {sid: username}
+user_sessions = {}     # Maps session ID to username
 cursor_positions = {}  # Stores {username: {x: 0, y: 0}}
 shared_code = {'code': ''}  # Stores shared code among users
 

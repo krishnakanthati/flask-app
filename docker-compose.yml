@@ -1,0 +1,21 @@
+version: '3'
+services:
+  web:
+    image: krishnakanthati/flask-app:latest
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/collab_code_db
+    depends_on:
+      - mongodb
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+
+  frontend:
+    image: krishnakanthati/react-app:dev
+    ports:
+      - "5173:5173"
